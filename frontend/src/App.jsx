@@ -1,3 +1,4 @@
+import { supabase } from './supabaseClient';
 import React, { useState, useEffect } from 'react';
 import { Camera, Upload, MapPin, Clock, Sparkles, Menu, X, ChevronRight, Star, Lock, User, LogOut, History } from 'lucide-react';
 // Mock Auth Context
@@ -8,42 +9,37 @@ const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored user
-    const stored = localStorage.getItem('heritageai_user');
-    if (stored) {
-      setUser(JSON.parse(stored));
-    }
-    setLoading(false);
+    // 1. Check for an active session when the app loads
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    // 2. Listen for login/logout changes automatically
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = (email, password) => {
-    // Mock login
-    const mockUser = {
-      id: '1',
-      name: email.split('@')[0],
-      email,
-      isPremium: false,
-      uploadsToday: 0
-    };
-    setUser(mockUser);
-    localStorage.setItem('heritageai_user', JSON.stringify(mockUser));
+  const login = async (email, password) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password }); //
+    if (error) alert(error.message);
   };
 
-  const signup = (name, email, password) => {
-    const mockUser = {
-      id: '1',
-      name,
+  const signup = async (name, email, password) => {
+    const { data, error } = await supabase.auth.signUp({
       email,
-      isPremium: false,
-      uploadsToday: 0
-    };
-    setUser(mockUser);
-    localStorage.setItem('heritageai_user', JSON.stringify(mockUser));
+      password,
+      options: { data: { full_name: name } } // Saves the name to user metadata
+    });
+    if (error) alert(error.message);
+    else alert("Check your email for a confirmation link!");
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('heritageai_user');
+  const logout = async () => {
+    await supabase.auth.signOut(); //
   };
 
   return (
@@ -429,21 +425,29 @@ const UploadPage = ({ setCurrentPage }) => {
   };
 
   const handleAnalyze = async () => {
-    if (!file) return;
+      if (!file || !user) return;
+      setLoading(true);
 
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setResult({
-        civilization: 'Gandhara',
-        era: '1st-5th Century CE',
-        story: 'This artifact represents the Gandhara school of Buddhist art, which flourished in ancient Pakistan. The Gandhara civilization was a major center of Buddhist culture and learning, known for its distinctive Greco-Buddhist artistic style that combined Hellenistic and Indian influences.',
-        usage: 'This type of artifact was likely used in religious ceremonies and meditation practices. It represents the Buddha or Bodhisattva figures that were central to Buddhist worship during this period.',
-        significance: 'The Gandhara region, located in modern-day Pakistan and Afghanistan, was a crucial crossroads of ancient trade routes and cultural exchange. This artifact exemplifies how Buddhism adapted and flourished in this region, incorporating artistic elements from Greek, Persian, and Indian traditions.',
-        confidence: 0.87
-      });
-      setLoading(false);
-    }, 2000);
+      // Simulate AI response (Replace this part later with your actual AI API call)
+      setTimeout(async () => {
+        const resultData = {
+          user_id: user.id, // Links the artifact to the logged-in user
+          civilization: 'Gandhara',
+          era: '1st-5th Century CE',
+          story: 'This artifact represents the Gandhara school of Buddhist art...',
+          confidence: 0.87
+        };
+
+        // SAVE TO SUPABASE
+        const { error } = await supabase.from('artifacts').insert([resultData]);
+
+        if (error) {
+          console.error("Error saving to DB:", error.message);
+        } else {
+          setResult(resultData);
+        }
+        setLoading(false);
+      }, 2000);
   };
 
   if (!user) {
@@ -568,7 +572,7 @@ const UploadPage = ({ setCurrentPage }) => {
   );
 };
 
-//pull request 
+
 // Heritage Sites List
 const SitesPage = ({ setCurrentPage }) => {
   const sites = [

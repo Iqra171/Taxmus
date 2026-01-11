@@ -571,6 +571,7 @@ const UploadPage = ({ setCurrentPage }) => {
 // Heritage Sites List
 const SitesPage = ({ setCurrentPage }) => {
   const sites = [
+
     { id: 'taxila', name: 'Taxila', description: 'Ancient Buddhist city and UNESCO World Heritage Site', era: '6th Century BCE', image: 'https://images.unsplash.com/photo-1564507592333-c60657eea523?w=800' },
     { id: 'mohenjo-daro', name: 'Mohenjo-daro', description: 'One of the world\'s earliest urban settlements', era: '2500 BCE', image: 'https://images.unsplash.com/photo-1548013146-72479768bada?w=800' },
     { id: 'harappa', name: 'Harappa', description: 'Major center of the Indus Valley Civilization', era: '3300 BCE', image: 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?w=800' }

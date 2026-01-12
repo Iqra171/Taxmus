@@ -1,5 +1,6 @@
 // src/components/CuratorResult.jsx
 import React, { useState, useEffect } from "react";
+
 import "../styles/curator.css";
 
 const CuratorResult = ({ result }) => {

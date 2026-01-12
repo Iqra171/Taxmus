@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, Upload, MapPin, Clock, Sparkles, Menu, X, ChevronRight, Star, Lock, User, LogOut, History } from 'lucide-react';
+import { curateImage } from "./api/curatorApi"; 
+import CuratorResult from './components/CuratorResult'; // Adjust the path based on your file structure
 // Mock Auth Context
 const AuthContext = React.createContext();
 
@@ -145,7 +147,7 @@ const HomePage = ({ setCurrentPage }) => {
       id: 'taxila',
       name: 'Taxila',
       description: 'Ancient Buddhist city and UNESCO World Heritage Site',
-      image: 'https://images.unsplash.com/photo-1564507592333-c60657eea523?w=800',
+      image: 'https://unsplash.com/photos/a-very-old-city-with-a-lot-of-ruins-khWqt4JYej4',
       era: '6th Century BCE'
     },
     {
@@ -408,14 +410,21 @@ const SignupPage = ({ setCurrentPage }) => {
     </div>
   );
 };
-
 // Upload Artifact Page
 const UploadPage = ({ setCurrentPage }) => {
+  console.log("UploadPage rendering"); // Debug rendering
+  
   const { user } = useAuth();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  // Log when result changes
+  useEffect(() => {
+    console.log("Result state changed:", result);
+  }, [result]);
 
   const canUpload = user?.isPremium || (user?.uploadsToday || 0) < 3;
 
@@ -425,25 +434,84 @@ const UploadPage = ({ setCurrentPage }) => {
       setFile(selectedFile);
       setPreview(URL.createObjectURL(selectedFile));
       setResult(null);
+      setError(null);
     }
   };
 
-  const handleAnalyze = async () => {
-    if (!file) return;
+ const handleAnalyze = async () => {
+  if (!file) return;
+  
+  setLoading(true);
+  setResult(null);
+  setError(null);
 
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setResult({
-        civilization: 'Gandhara',
-        era: '1st-5th Century CE',
-        story: 'This artifact represents the Gandhara school of Buddhist art, which flourished in ancient Pakistan. The Gandhara civilization was a major center of Buddhist culture and learning, known for its distinctive Greco-Buddhist artistic style that combined Hellenistic and Indian influences.',
-        usage: 'This type of artifact was likely used in religious ceremonies and meditation practices. It represents the Buddha or Bodhisattva figures that were central to Buddhist worship during this period.',
-        significance: 'The Gandhara region, located in modern-day Pakistan and Afghanistan, was a crucial crossroads of ancient trade routes and cultural exchange. This artifact exemplifies how Buddhism adapted and flourished in this region, incorporating artistic elements from Greek, Persian, and Indian traditions.',
-        confidence: 0.87
-      });
-      setLoading(false);
-    }, 2000);
+  try {
+    console.log("Starting image analysis for file:", file.name);
+    
+    const data = await curateImage(file);
+    console.log("API result from /curate:", data);
+    
+    if (!data) {
+      console.error("No data received from API");
+      setError("No data received from the server.");
+      return;
+    }
+    
+    // Check the structure of the data AFTER receiving it
+    console.log("Data structure:", {
+      isArray: Array.isArray(data),
+      hasInterpretations: data && data.interpretations && Array.isArray(data.interpretations),
+      keys: data ? Object.keys(data) : [],
+      interpretationsCount: data?.interpretations?.length || 0
+    });
+    
+    setResult(data);
+    console.log("Result state set successfully");
+    
+  } catch (err) {
+    console.error("Error during image analysis:", err);
+    
+    // Handle axios specific errors
+    if (err.response) {
+      console.error("Server error response:", err.response.status, err.response.data);
+      
+      if (err.response.status === 413) {
+        setError("The image file is too large. Please use a smaller image (under 10MB).");
+      } else if (err.response.status === 415) {
+        setError("Unsupported file type. Please use JPG or PNG images.");
+      } else if (err.response.status === 401 || err.response.status === 403) {
+        setError("Authentication error. Please sign in again.");
+      } else if (err.response.status >= 500) {
+        setError("Server error. Our team has been notified and is working on it.");
+      } else {
+        setError(`Server error (${err.response.status}): ${err.response.data.detail || "Unknown error"}`);
+      }
+    } else if (err.request) {
+      console.error("No response received:", err.request);
+      setError("No response from server. Please check your internet connection and ensure the backend is running on http://localhost:8000");
+    } else {
+      console.error("Request setup error:", err.message);
+      setError(`Failed to analyze the artifact: ${err.message}`);
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+  // Wrap the result rendering in error boundary
+  const renderResult = () => {
+    try {
+      if (result) {
+        return <CuratorResult result={result} />;
+      }
+      return null;
+    } catch (err) {
+      console.error("Error rendering CuratorResult:", err);
+      return (
+        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-800">Error displaying results. Please try again.</p>
+        </div>
+      );
+    }
   };
 
   if (!user) {
@@ -485,7 +553,7 @@ const UploadPage = ({ setCurrentPage }) => {
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">Upload an image</h3>
                 <p className="text-gray-600 mb-4">PNG, JPG up to 10MB</p>
                 <span className="bg-amber-600 text-white px-6 py-3 rounded-lg font-semibold inline-block hover:bg-amber-700 transition">
-                  Choose File
+                  Choose File  
                 </span>
               </div>
               <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" disabled={!canUpload} />
@@ -508,6 +576,12 @@ const UploadPage = ({ setCurrentPage }) => {
             </div>
           )}
 
+          {error && (
+            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-800">{error}</p>
+            </div>
+          )}
+
           {loading && (
             <div className="text-center py-8">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-amber-600 border-t-transparent"></div>
@@ -515,58 +589,27 @@ const UploadPage = ({ setCurrentPage }) => {
             </div>
           )}
 
-          {result && (
-            <div className="mt-8 space-y-6">
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Analysis Results</h3>
-
-                <div className="grid md:grid-cols-2 gap-4 mb-6">
-                  <div className="bg-amber-50 p-4 rounded-lg">
-                    <p className="text-sm text-amber-800 font-semibold mb-1">Civilization</p>
-                    <p className="text-lg font-bold text-gray-900">{result.civilization}</p>
-                  </div>
-                  <div className="bg-amber-50 p-4 rounded-lg">
-                    <p className="text-sm text-amber-800 font-semibold mb-1">Era</p>
-                    <p className="text-lg font-bold text-gray-900">{result.era}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Historical Context</h4>
-                    <p className="text-gray-700">{result.story}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Usage & Purpose</h4>
-                    <p className="text-gray-700">{result.usage}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Cultural Significance</h4>
-                    <p className="text-gray-700">{result.significance}</p>
-                  </div>
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      <span className="font-semibold">AI Confidence:</span> {(result.confidence * 100).toFixed(0)}%
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4 mt-6">
-                  <button onClick={() => { setFile(null); setPreview(null); setResult(null); }} className="flex-1 bg-amber-600 text-white py-3 rounded-lg font-semibold hover:bg-amber-700 transition">
-                    Analyze Another
-                  </button>
-                  <button onClick={() => setCurrentPage('profile')} className="px-6 py-3 border-2 border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition">
-                    View History
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+         {result && (
+  <div>
+    {/* Use the error-handled rendering function */}
+    {renderResult()}
+    
+    <div className="flex gap-4 mt-6">
+      <button onClick={() => { setFile(null); setPreview(null); setResult(null); }} className="flex-1 bg-amber-600 text-white py-3 rounded-lg font-semibold hover:bg-amber-700 transition">
+        Analyze Another
+      </button>
+      <button onClick={() => setCurrentPage('profile')} className="px-6 py-3 border-2 border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition">
+        View History
+      </button>
+    </div>
+  </div>
+)}
         </div>
       </div>
     </div>
   );
 };
+
 
 // Heritage Sites List
 const SitesPage = ({ setCurrentPage }) => {
@@ -826,9 +869,32 @@ const AboutPage = () => {
 };
 
 // Main App Component
+// Main App Component
 const App = () => {
-  const [currentPage, setCurrentPage] = useState('home');
+  const [currentPage, setCurrentPage] = useState(() => {
+    // Initialize from URL hash or default to 'home'
+    const hash = window.location.hash.slice(1);
+    return hash || 'home';
+  });
   const { loading } = useAuth();
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = (e) => {
+      const hash = window.location.hash.slice(1);
+      setCurrentPage(hash || 'home');
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Update URL when page changes
+  useEffect(() => {
+    if (window.location.hash.slice(1) !== currentPage) {
+      window.history.pushState(null, '', `#${currentPage}`);
+    }
+  }, [currentPage]);
 
   if (loading) {
     return (

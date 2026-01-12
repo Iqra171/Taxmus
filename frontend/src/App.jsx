@@ -598,14 +598,14 @@ const UploadPage = ({ setCurrentPage }) => {
   );
 };
 
-
-// Heritage Sites List
 const SitesPage = ({ setCurrentPage }) => {
   const sites = [
-
-    { id: 'taxila', name: 'Taxila', description: 'Ancient Buddhist city and UNESCO World Heritage Site', era: '6th Century BCE', image: 'https://images.unsplash.com/photo-1564507592333-c60657eea523?w=800' },
-    { id: 'mohenjo-daro', name: 'Mohenjo-daro', description: 'One of the world\'s earliest urban settlements', era: '2500 BCE', image: 'https://images.unsplash.com/photo-1548013146-72479768bada?w=800' },
-    { id: 'harappa', name: 'Harappa', description: 'Major center of the Indus Valley Civilization', era: '3300 BCE', image: 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?w=800' }
+    { id: 'taxila', name: 'Taxila', description: 'Ancient Buddhist city and UNESCO World Heritage Site', era: '6th Century BCE', image: 'https://plus.unsplash.com/premium_photo-1694475128245-999b1ae8a44e?w=800' },
+    { id: 'mohenjo-daro', name: 'Mohenjo-daro', description: 'One of the world\'s earliest urban settlements', era: '2500 BCE', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Mohenjodaro_-_view_of_the_stupa_mound.JPG/1280px-Mohenjodaro_-_view_of_the_stupa_mound.JPG?w=800' },
+    { id: 'harappa', name: 'Harappa', description: 'Major center of the Indus Valley Civilization', era: '3300 BCE', image: 'https://www.worldatlas.com/r/w960-q80/upload/a8/04/4d/shutterstock-1075655459.jpg?w=800' },
+    { id: 'katas-raj', name: 'Katas Raj Temples', description: 'Ancient complex of Hindu temples connected by a sacred pond', era: '7th Century CE', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Katas_Raj_Temples_2.JPG/1280px-Katas_Raj_Temples_2.JPG?w=800' },
+    { id: 'makli', name: 'Makli Necropolis', description: 'One of the largest funerary sites in the world with stunning stone carvings', era: '14th Century CE', image: 'https://upload.wikimedia.org/wikipedia/commons/d/d4/View_of_Makli_by_Usman_Ghani_%28cropped%29.jpg?w=800' },
+    { id: 'ranikot', name: 'Ranikot Fort', description: 'Known as the Great Wall of Sindh, the largest fort in the world', era: '17th Century CE', image: 'https://en.wikipedia.org/wiki/Ranikot_Fort#/media/File:Ranikot_Fort_-_The_Great_Wall_of_Sindh.jpg?w=800' }
   ];
 
   return (
@@ -625,7 +625,7 @@ const SitesPage = ({ setCurrentPage }) => {
                   <h2 className="text-2xl font-bold text-gray-900">{site.name}</h2>
                   <span className="text-sm text-amber-600 font-semibold">{site.era}</span>
                 </div>
-                <p className="text-gray-600 mb-4">{site.description}</p>
+                <p className="text-gray-600 mb-4 line-clamp-2">{site.description}</p>
                 <button className="text-amber-600 font-semibold flex items-center space-x-1 hover:text-amber-700">
                   <span>Explore Site</span>
                   <ChevronRight className="w-4 h-4" />
@@ -638,7 +638,6 @@ const SitesPage = ({ setCurrentPage }) => {
     </div>
   );
 };
-
 // Individual Site Page
 const SitePage = ({ siteId, setCurrentPage }) => {
   const siteData = {

@@ -1,3 +1,4 @@
+import { supabase } from './supabaseClient';
 import React, { useState, useEffect } from 'react';
 import { Camera, Upload, MapPin, Clock, Sparkles, Menu, X, ChevronRight, Star, Lock, User, LogOut, History } from 'lucide-react';
 import { curateImage } from "./api/curatorApi"; 
@@ -10,42 +11,63 @@ const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored user
-    const stored = localStorage.getItem('heritageai_user');
-    if (stored) {
-      setUser(JSON.parse(stored));
-    }
-    setLoading(false);
+    // 1. Check for an active session when the app loads
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    // 2. Listen for login/logout changes automatically
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = (email, password) => {
-    // Mock login
-    const mockUser = {
-      id: '1',
-      name: email.split('@')[0],
-      email,
-      isPremium: false,
-      uploadsToday: 0
-    };
-    setUser(mockUser);
-    localStorage.setItem('heritageai_user', JSON.stringify(mockUser));
+  const login = async (email, password) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password }); //
+    if (error) alert(error.message);
   };
 
-  const signup = (name, email, password) => {
-    const mockUser = {
-      id: '1',
-      name,
-      email,
-      isPremium: false,
-      uploadsToday: 0
-    };
-    setUser(mockUser);
-    localStorage.setItem('heritageai_user', JSON.stringify(mockUser));
-  };
+  const signup = async (name, email, password) => {
+    // 1. Create the user in Supabase Auth
+    const { data, error } = await supabase.auth.signUp({
+    email,
+    password
+    });
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('heritageai_user');
+    if (error) {
+    alert(error.message);
+    return;
+    }
+
+    // 2. If signup worked, manually create the profile row
+    if (data.user) {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: data.user.id, // Links the profile to the Auth user ID
+            full_name: name,
+            email: email,
+            is_premium: false,
+            uploads_today: 0
+          }
+        ]);
+
+        if (profileError) {
+          console.error("Error creating profile:", profileError.message);
+        } else {
+          alert("Check your email for a confirmation link!");
+          setCurrentPage('login');
+        }
+      }
+    };
+
+
+  const logout = async () => {
+    await supabase.auth.signOut(); //
   };
 
   return (
@@ -438,80 +460,30 @@ const UploadPage = ({ setCurrentPage }) => {
     }
   };
 
- const handleAnalyze = async () => {
-  if (!file) return;
-  
-  setLoading(true);
-  setResult(null);
-  setError(null);
+  const handleAnalyze = async () => {
+      if (!file || !user) return;
+      setLoading(true);
 
-  try {
-    console.log("Starting image analysis for file:", file.name);
-    
-    const data = await curateImage(file);
-    console.log("API result from /curate:", data);
-    
-    if (!data) {
-      console.error("No data received from API");
-      setError("No data received from the server.");
-      return;
-    }
-    
-    // Check the structure of the data AFTER receiving it
-    console.log("Data structure:", {
-      isArray: Array.isArray(data),
-      hasInterpretations: data && data.interpretations && Array.isArray(data.interpretations),
-      keys: data ? Object.keys(data) : [],
-      interpretationsCount: data?.interpretations?.length || 0
-    });
-    
-    setResult(data);
-    console.log("Result state set successfully");
-    
-  } catch (err) {
-    console.error("Error during image analysis:", err);
-    
-    // Handle axios specific errors
-    if (err.response) {
-      console.error("Server error response:", err.response.status, err.response.data);
-      
-      if (err.response.status === 413) {
-        setError("The image file is too large. Please use a smaller image (under 10MB).");
-      } else if (err.response.status === 415) {
-        setError("Unsupported file type. Please use JPG or PNG images.");
-      } else if (err.response.status === 401 || err.response.status === 403) {
-        setError("Authentication error. Please sign in again.");
-      } else if (err.response.status >= 500) {
-        setError("Server error. Our team has been notified and is working on it.");
-      } else {
-        setError(`Server error (${err.response.status}): ${err.response.data.detail || "Unknown error"}`);
-      }
-    } else if (err.request) {
-      console.error("No response received:", err.request);
-      setError("No response from server. Please check your internet connection and ensure the backend is running on http://localhost:8000");
-    } else {
-      console.error("Request setup error:", err.message);
-      setError(`Failed to analyze the artifact: ${err.message}`);
-    }
-  } finally {
-    setLoading(false);
-  }
-};
-  // Wrap the result rendering in error boundary
-  const renderResult = () => {
-    try {
-      if (result) {
-        return <CuratorResult result={result} />;
-      }
-      return null;
-    } catch (err) {
-      console.error("Error rendering CuratorResult:", err);
-      return (
-        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-800">Error displaying results. Please try again.</p>
-        </div>
-      );
-    }
+      // Simulate AI response (Replace this part later with your actual AI API call)
+      setTimeout(async () => {
+        const resultData = {
+          user_id: user.id, // Links the artifact to the logged-in user
+          civilization: 'Gandhara',
+          era: '1st-5th Century CE',
+          story: 'This artifact represents the Gandhara school of Buddhist art...',
+          confidence: 0.87
+        };
+
+        // SAVE TO SUPABASE
+        const { error } = await supabase.from('artifacts').insert([resultData]);
+
+        if (error) {
+          console.error("Error saving to DB:", error.message);
+        } else {
+          setResult(resultData);
+        }
+        setLoading(false);
+      }, 2000);
   };
 
   if (!user) {
@@ -614,10 +586,12 @@ const UploadPage = ({ setCurrentPage }) => {
 // Heritage Sites List
 const SitesPage = ({ setCurrentPage }) => {
   const sites = [
-
-    { id: 'taxila', name: 'Taxila', description: 'Ancient Buddhist city and UNESCO World Heritage Site', era: '6th Century BCE', image: 'https://images.unsplash.com/photo-1564507592333-c60657eea523?w=800' },
-    { id: 'mohenjo-daro', name: 'Mohenjo-daro', description: 'One of the world\'s earliest urban settlements', era: '2500 BCE', image: 'https://images.unsplash.com/photo-1548013146-72479768bada?w=800' },
-    { id: 'harappa', name: 'Harappa', description: 'Major center of the Indus Valley Civilization', era: '3300 BCE', image: 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?w=800' }
+    { id: 'taxila', name: 'Taxila', description: 'Ancient Buddhist city and UNESCO World Heritage Site', era: '6th Century BCE', image: 'https://plus.unsplash.com/premium_photo-1694475128245-999b1ae8a44e?w=800' },
+    { id: 'mohenjo-daro', name: 'Mohenjo-daro', description: 'One of the world\'s earliest urban settlements', era: '2500 BCE', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Mohenjodaro_-_view_of_the_stupa_mound.JPG/1280px-Mohenjodaro_-_view_of_the_stupa_mound.JPG?w=800' },
+    { id: 'harappa', name: 'Harappa', description: 'Major center of the Indus Valley Civilization', era: '3300 BCE', image: 'https://www.worldatlas.com/r/w960-q80/upload/a8/04/4d/shutterstock-1075655459.jpg?w=800' },
+    { id: 'katas-raj', name: 'Katas Raj Temples', description: 'Ancient complex of Hindu temples connected by a sacred pond', era: '7th Century CE', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Katas_Raj_Temples_2.JPG/1280px-Katas_Raj_Temples_2.JPG?w=800' },
+    { id: 'makli', name: 'Makli Necropolis', description: 'One of the largest funerary sites in the world with stunning stone carvings', era: '14th Century CE', image: 'https://upload.wikimedia.org/wikipedia/commons/d/d4/View_of_Makli_by_Usman_Ghani_%28cropped%29.jpg?w=800' },
+    { id: 'ranikot', name: 'Ranikot Fort', description: 'Known as the Great Wall of Sindh, the largest fort in the world', era: '17th Century CE', image: 'https://en.wikipedia.org/wiki/Ranikot_Fort#/media/File:Ranikot_Fort_-_The_Great_Wall_of_Sindh.jpg?w=800' }
   ];
 
   return (
@@ -637,7 +611,7 @@ const SitesPage = ({ setCurrentPage }) => {
                   <h2 className="text-2xl font-bold text-gray-900">{site.name}</h2>
                   <span className="text-sm text-amber-600 font-semibold">{site.era}</span>
                 </div>
-                <p className="text-gray-600 mb-4">{site.description}</p>
+                <p className="text-gray-600 mb-4 line-clamp-2">{site.description}</p>
                 <button className="text-amber-600 font-semibold flex items-center space-x-1 hover:text-amber-700">
                   <span>Explore Site</span>
                   <ChevronRight className="w-4 h-4" />
@@ -650,7 +624,6 @@ const SitesPage = ({ setCurrentPage }) => {
     </div>
   );
 };
-
 // Individual Site Page
 const SitePage = ({ siteId, setCurrentPage }) => {
   const siteData = {
@@ -751,19 +724,47 @@ const SitePage = ({ siteId, setCurrentPage }) => {
 // Profile Page
 const ProfilePage = ({ setCurrentPage }) => {
   const { user } = useAuth();
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // 1. Fetch real history from Supabase
+  useEffect(() => {
+    const fetchHistory = async () => {
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('artifacts')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!error) {
+        setHistory(data);
+      }
+      setLoading(false);
+    };
+
+    fetchHistory();
+  }, [user]);
+
+  // Use metadata name for real Supabase users
+  const displayName = user?.user_metadata?.full_name || "Heritage Explorer";
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-4xl font-bold text-gray-900 mb-8">My Profile</h1>
 
+        {/* Profile Card */}
         <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
           <div className="flex items-center space-x-4 mb-6">
             <div className="w-20 h-20 bg-gradient-to-br from-amber-600 to-orange-700 rounded-full flex items-center justify-center">
-              <span className="text-3xl font-bold text-white">{user?.name?.[0]?.toUpperCase()}</span>
+              <span className="text-3xl font-bold text-white">
+                {displayName[0].toUpperCase()}
+              </span>
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">{user?.name}</h2>
+              <h2 className="text-2xl font-bold text-gray-900">{displayName}</h2>
               <p className="text-gray-600">{user?.email}</p>
             </div>
           </div>
@@ -773,32 +774,28 @@ const ProfilePage = ({ setCurrentPage }) => {
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-600 mb-1">Account Type</p>
                 <div className="flex items-center space-x-2">
-                  <p className="text-lg font-bold text-gray-900">{user?.isPremium ? 'Premium' : 'Free'}</p>
-                  {!user?.isPremium && (
-                    <Star className="w-5 h-5 text-gray-400" />
-                  )}
+                  <p className="text-lg font-bold text-gray-900">
+                    {user?.is_premium ? 'Premium' : 'Free'}
+                  </p>
+                  {!user?.is_premium && <Star className="w-5 h-5 text-gray-400" />}
                 </div>
               </div>
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-600 mb-1">Uploads Today</p>
-                <p className="text-lg font-bold text-gray-900">{user?.uploadsToday || 0} / {user?.isPremium ? '∞' : '3'}</p>
+                <p className="text-lg font-bold text-gray-900">
+                  {user?.uploads_today || 0} / {user?.is_premium ? '∞' : '3'}
+                </p>
               </div>
             </div>
 
-            {!user?.isPremium && (
+            {!user?.is_premium && (
               <div className="bg-gradient-to-r from-amber-600 to-orange-600 rounded-xl p-6 text-white mb-8">
                 <div className="flex items-start space-x-4">
                   <Star className="w-8 h-8 flex-shrink-0" />
                   <div>
                     <h3 className="text-2xl font-bold mb-2">Upgrade to Premium</h3>
-                    <ul className="space-y-2 mb-4">
-                      <li>✓ Unlimited artifact uploads</li>
-                      <li>✓ Priority AI analysis</li>
-                      <li>✓ Early access to AR features</li>
-                      <li>✓ Download detailed reports</li>
-                    </ul>
-                    <button className="bg-white text-amber-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-50 transition">
-                      Upgrade Now - Coming Soon
+                    <button className="bg-white text-amber-600 px-6 py-2 rounded-lg font-semibold hover:bg-gray-50 transition">
+                      Upgrade Now
                     </button>
                   </div>
                 </div>
@@ -807,18 +804,48 @@ const ProfilePage = ({ setCurrentPage }) => {
           </div>
         </div>
 
+        {/* Upload History Section */}
         <div className="bg-white rounded-xl shadow-lg p-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Upload History</h2>
             <History className="w-6 h-6 text-gray-400" />
           </div>
-          <div className="text-center py-12">
-            <History className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-600 mb-4">No uploads yet</p>
-            <button onClick={() => setCurrentPage('upload')} className="text-amber-600 font-semibold hover:text-amber-700">
-              Upload Your First Artifact
-            </button>
-          </div>
+
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600 mx-auto"></div>
+            </div>
+          ) : history.length > 0 ? (
+            <div className="space-y-4">
+              {history.map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-amber-100 rounded flex items-center justify-center">
+                      <Clock className="w-6 h-6 text-amber-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900">{item.civilization}</h4>
+                      <p className="text-sm text-gray-500">{item.era}</p>
+                    </div>
+                  </div>
+                  <button className="text-amber-600 hover:text-amber-700">
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <History className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-600 mb-4">No uploads yet</p>
+              <button
+                onClick={() => setCurrentPage('upload')}
+                className="text-amber-600 font-semibold hover:text-amber-700"
+              >
+                Upload Your First Artifact
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

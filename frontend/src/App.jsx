@@ -1,5 +1,5 @@
-import { supabase } from './supabaseClient';
 import React, { useState, useEffect } from 'react';
+<<<<<<< Updated upstream
 import { Camera, Upload, MapPin, Clock, Sparkles, Menu, X, ChevronRight, Star, Lock, User, LogOut, History } from 'lucide-react';
 import { curateImage } from "./api/curatorApi"; 
 import CuratorResult from './components/CuratorResult'; // Adjust the path based on your file structure
@@ -898,16 +898,36 @@ const AboutPage = () => {
 // Main App Component
 // Main App Component
 const App = () => {
+=======
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+
+import Navbar from './components/Navbar';
+import Footer from './components/Footer';
+import HomePage from './pages/HomePage';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import UploadPage from './pages/UploadPage';
+import SitesPage from './pages/SitesPage';
+import SitePage from './pages/SitePage';
+import ProfilePage from './pages/ProfilePage';
+import AboutPage from './pages/AboutPage';
+import BlogPage from './pages/BlogPage';
+import ContactPage from './pages/ContactPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
+import SubmitArticlePage from './pages/SubmitArticlePage';
+import Pricing from './pages/Pricing';
+
+const AppContent = () => {
+>>>>>>> Stashed changes
   const [currentPage, setCurrentPage] = useState(() => {
-    // Initialize from URL hash or default to 'home'
     const hash = window.location.hash.slice(1);
     return hash || 'home';
   });
   const { loading } = useAuth();
 
-  // Handle browser back/forward buttons
   useEffect(() => {
-    const handlePopState = (e) => {
+    const handlePopState = () => {
       const hash = window.location.hash.slice(1);
       setCurrentPage(hash || 'home');
     };
@@ -916,11 +936,15 @@ const App = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Update URL when page changes
   useEffect(() => {
     if (window.location.hash.slice(1) !== currentPage) {
       window.history.pushState(null, '', `#${currentPage}`);
     }
+  }, [currentPage]);
+
+  // ✅ ADD THIS useEffect - Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo(0, 0);
   }, [currentPage]);
 
   if (loading) {
@@ -939,6 +963,12 @@ const App = () => {
     if (currentPage === 'sites') return <SitesPage setCurrentPage={setCurrentPage} />;
     if (currentPage === 'profile') return <ProfilePage setCurrentPage={setCurrentPage} />;
     if (currentPage === 'about') return <AboutPage />;
+    if (currentPage === 'blog') return <BlogPage />;
+    if (currentPage === 'contact') return <ContactPage />;
+    if (currentPage === 'privacy') return <PrivacyPolicyPage />;
+    if (currentPage === 'terms') return <TermsOfServicePage />;
+    if (currentPage === 'pricing') return <Pricing setCurrentPage={setCurrentPage} />;
+    if (currentPage === 'submit-article') return <SubmitArticlePage setCurrentPage={setCurrentPage} />;
     if (currentPage.startsWith('site-')) {
       const siteId = currentPage.replace('site-', '');
       return <SitePage siteId={siteId} setCurrentPage={setCurrentPage} />;
@@ -950,56 +980,17 @@ const App = () => {
     <div className="min-h-screen bg-white">
       <Navbar currentPage={currentPage} setCurrentPage={setCurrentPage} />
       {renderPage()}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-amber-600 to-orange-700 rounded-lg flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xl font-bold">HeritageAI</span>
-              </div>
-              <p className="text-gray-400">Exploring South Asian heritage through AI technology</p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Product</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><button onClick={() => setCurrentPage('upload')} className="hover:text-white">Upload Artifact</button></li>
-                <li><button onClick={() => setCurrentPage('sites')} className="hover:text-white">Heritage Sites</button></li>
-                <li><button className="hover:text-white">Pricing</button></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Company</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><button onClick={() => setCurrentPage('about')} className="hover:text-white">About</button></li>
-                <li><button className="hover:text-white">Blog</button></li>
-                <li><button className="hover:text-white">Contact</button></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Legal</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><button className="hover:text-white">Privacy Policy</button></li>
-                <li><button className="hover:text-white">Terms of Service</button></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>© 2026 HeritageAI. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+      <Footer setCurrentPage={setCurrentPage} />
     </div>
   );
 };
 
-// Root Component
-export default function Root() {
+function App() {
   return (
     <AuthProvider>
-      <App />
+      <AppContent />
     </AuthProvider>
   );
 }
+
+export default App;

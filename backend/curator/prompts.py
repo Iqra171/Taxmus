@@ -23,7 +23,7 @@ Return ONLY valid JSON with this exact structure and property names, and nothing
 
 Rules:
 
-1. Always return at least 1 and at most 3 objects in the "interpretations" array.
+1. Always return at least 1 and at most 2 objects in the "interpretations" array.
 
 2. The "description" field:
    - MUST start with the speaker emoji: "🔊 " (speaker, then a space).

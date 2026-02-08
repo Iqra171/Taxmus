@@ -1,9 +1,4 @@
 import uvicorn
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List
-
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from curator.gemini_client import run_gemini
@@ -12,12 +7,20 @@ from curator.prompts import CURATOR_PROMPT
 
 app = FastAPI()
 print("Starting FastAPI server...")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5174"],
+    allow_origins=[
+        "http://localhost:5173",  # Vite
+        "http://localhost:3000",   # Create React App
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000"
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 @app.get("/")
 def health():
     return {"status": "ok", "service": "AI Museum Curator API"}
@@ -32,39 +35,23 @@ async def curate_image(image: UploadFile = File(...)):
 
     result = curate(image_bytes, raw_output)
     print("✅ final result:", result)
+    print("✅ result type:", type(result))
 
-    return result
-
-# class Fruit(BaseModel):
-#     name:str
-
-# class Fruits(BaseModel):
-#     fruits: List[Fruit] 
-    
-# app=FastAPI()
-
-# origins  =[
-#     "http://localhost:5173"
-# ]
-
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=origins,
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
-
-# memory_db ={"fruits":[]}
-
-# @app.get("/fruits", response_model=Fruits)
-# def get_fruits():
-#     return Fruits(fruits=memory_db["fruits"])
-
-# @app.post("/fruits", response_model=Fruit)
-# def add_fruit(fruit: Fruit):
-#     memory_db["fruits"].append(fruit)
-#     return fruit
+    # Convert Pydantic model to dict for JSON serialization
+    try:
+        if hasattr(result, 'model_dump'):  # Pydantic v2
+            result_dict = result.model_dump()
+        elif hasattr(result, 'dict'):  # Pydantic v1
+            result_dict = result.dict()
+        else:
+            result_dict = result
+        
+        print("📤 Sending to frontend as dict:", result_dict)
+        print("📤 Keys in result:", list(result_dict.keys()) if isinstance(result_dict, dict) else "Not a dict!")
+        return result_dict
+    except Exception as e:
+        print("❌ Error converting result:", e)
+        raise
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
